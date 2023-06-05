@@ -336,6 +336,94 @@ impl<'a> SpdmContext<'a> {
         }
     }
 
+    pub fn append_message_mut_b(&mut self, new_message: &[u8]) -> SpdmResult {
+        #[cfg(not(feature = "hashed-transcript-data"))]
+        {
+            self.runtime_info
+                .message_mut_b
+                .append_message(new_message)
+                .ok_or(SPDM_STATUS_BUFFER_FULL)?;
+        }
+
+        #[cfg(feature = "hashed-transcript-data")]
+        {
+            if self.runtime_info.digest_context_mut_m1m2.is_none() {
+                self.runtime_info.digest_context_mut_m1m2 =
+                    crypto::hash::hash_ctx_init(self.negotiate_info.base_hash_sel);
+                if self.runtime_info.digest_context_mut_m1m2.is_none() {
+                    return Err(SPDM_STATUS_INVALID_STATE_LOCAL);
+                }
+
+                crypto::hash::hash_ctx_update(
+                    self.runtime_info.digest_context_mut_m1m2.as_mut().unwrap(),
+                    self.runtime_info.message_a.as_ref(),
+                )?;
+            }
+
+            crypto::hash::hash_ctx_update(
+                self.runtime_info.digest_context_mut_m1m2.as_mut().unwrap(),
+                new_message,
+            )?;
+        }
+
+        Ok(())
+    }
+    pub fn reset_message_mut_b(&mut self) {
+        #[cfg(not(feature = "hashed-transcript-data"))]
+        {
+            self.runtime_info.message_mut_b.reset_message();
+        }
+
+        #[cfg(feature = "hashed-transcript-data")]
+        {
+            self.runtime_info.digest_context_mut_m1m2 = None;
+        }
+    }
+
+    pub fn append_message_mut_c(&mut self, new_message: &[u8]) -> SpdmResult {
+        #[cfg(not(feature = "hashed-transcript-data"))]
+        {
+            self.runtime_info
+                .message_mut_c
+                .append_message(new_message)
+                .ok_or(SPDM_STATUS_BUFFER_FULL)?;
+        }
+
+        #[cfg(feature = "hashed-transcript-data")]
+        {
+            if self.runtime_info.digest_context_mut_m1m2.is_none() {
+                self.runtime_info.digest_context_mut_m1m2 =
+                    crypto::hash::hash_ctx_init(self.negotiate_info.base_hash_sel);
+                if self.runtime_info.digest_context_mut_m1m2.is_none() {
+                    return Err(SPDM_STATUS_CRYPTO_ERROR);
+                }
+
+                crypto::hash::hash_ctx_update(
+                    self.runtime_info.digest_context_mut_m1m2.as_mut().unwrap(),
+                    self.runtime_info.message_a.as_ref(),
+                )?;
+            }
+
+            crypto::hash::hash_ctx_update(
+                self.runtime_info.digest_context_mut_m1m2.as_mut().unwrap(),
+                new_message,
+            )?;
+        }
+
+        Ok(())
+    }
+    pub fn reset_message_mut_c(&mut self) {
+        #[cfg(not(feature = "hashed-transcript-data"))]
+        {
+            self.runtime_info.message_mut_c.reset_message();
+        }
+
+        #[cfg(feature = "hashed-transcript-data")]
+        {
+            self.runtime_info.digest_context_mut_m1m2 = None;
+        }
+    }
+
     pub fn append_message_m(&mut self, session_id: Option<u32>, new_message: &[u8]) -> SpdmResult {
         #[cfg(not(feature = "hashed-transcript-data"))]
         match session_id {
@@ -1373,6 +1461,8 @@ pub struct SpdmRuntimeInfo {
     pub message_b: ManagedBufferB,
     pub message_c: ManagedBufferC,
     pub message_m: ManagedBufferM,
+    pub message_mut_b: ManagedBufferB,
+    pub message_mut_c: ManagedBufferC,
     pub content_changed: SpdmMeasurementContentChanged, // used by responder, set when content changed and spdm version is 1.2.
                                                         // used by requester, consume when measurement response report content changed.
 }
@@ -1389,6 +1479,7 @@ pub struct SpdmRuntimeInfo {
     pub message_a: ManagedBufferA,
     pub digest_context_m1m2: Option<SpdmHashCtx>, // for M1/M2
     pub digest_context_l1l2: Option<SpdmHashCtx>, // for out of session get measurement/measurement
+    pub digest_context_mut_m1m2: Option<SpdmHashCtx>, // for mutual authentication M1/M2
     pub content_changed: SpdmMeasurementContentChanged, // used by responder, set when content changed and spdm version is 1.2.
                                                         // used by requester, consume when measurement response report content changed.
 }
