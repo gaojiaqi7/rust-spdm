@@ -222,6 +222,37 @@ impl<'a> RequesterContext<'a> {
                                 return Err(SPDM_STATUS_INVALID_MSG_FIELD);
                             }
 
+                            self.common.runtime_info.set_local_used_cert_chain_slot_id(
+                                key_exchange_rsp.req_slot_id & 0xf,
+                            );
+                            if !key_exchange_rsp.mut_auth_req.is_empty() {
+                                if !self
+                                    .common
+                                    .negotiate_info
+                                    .req_capabilities_sel
+                                    .contains(SpdmRequestCapabilityFlags::MUT_AUTH_CAP)
+                                    || !self
+                                        .common
+                                        .negotiate_info
+                                        .rsp_capabilities_sel
+                                        .contains(SpdmResponseCapabilityFlags::MUT_AUTH_CAP)
+                                {
+                                    return Err(SPDM_STATUS_INVALID_MSG_FIELD);
+                                }
+                                if key_exchange_rsp.mut_auth_req != SpdmKeyExchangeMutAuthAttributes::MUT_AUTH_REQ &&
+                                    key_exchange_rsp.mut_auth_req != SpdmKeyExchangeMutAuthAttributes::MUT_AUTH_REQ_WITH_ENCAP_REQUEST &&
+                                    key_exchange_rsp.mut_auth_req != SpdmKeyExchangeMutAuthAttributes::MUT_AUTH_REQ_WITH_GET_DIGESTS {
+                                        return Err(SPDM_STATUS_INVALID_MSG_FIELD);
+                                    }
+                                if key_exchange_rsp.mut_auth_req
+                                    == SpdmKeyExchangeMutAuthAttributes::MUT_AUTH_REQ
+                                    && key_exchange_rsp.req_slot_id != 0xf
+                                    && key_exchange_rsp.req_slot_id as usize > SPDM_MAX_SLOT_NUMBER
+                                {
+                                    return Err(SPDM_STATUS_INVALID_MSG_FIELD);
+                                }
+                            }
+
                             let session = self
                                 .common
                                 .get_next_avaiable_session()
@@ -230,6 +261,7 @@ impl<'a> RequesterContext<'a> {
                             session.setup(session_id)?;
 
                             session.set_use_psk(false);
+                            session.set_mut_auth_requested(key_exchange_rsp.mut_auth_req);
 
                             session.set_crypto_param(
                                 base_hash_algo,
