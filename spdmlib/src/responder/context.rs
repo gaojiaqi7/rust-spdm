@@ -251,6 +251,12 @@ impl<'a> ResponderContext<'a> {
 
                 match SpdmMessageHeader::read(&mut reader) {
                     Some(message_header) => match message_header.request_response_code {
+                        SpdmRequestResponseCode::SpdmRequestGetEncapsulatedRequest => {
+                            self.handle_get_encapsulated_request(session_id, bytes)
+                        }
+                        SpdmRequestResponseCode::SpdmRequestDeliverEncapsulatedResponse => {
+                            self.handle_deliver_encapsulated_reponse(session_id, bytes)
+                        }
                         SpdmRequestResponseCode::SpdmRequestFinish => {
                             self.handle_spdm_finish(session_id, bytes)
                         }
